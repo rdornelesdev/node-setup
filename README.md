@@ -1,2 +1,8 @@
-# Setup NodeJS - JavaScript, ci/cd gh-actions, testes unitários com jest
+# Setup NodeJS
+
+🔧 Tools:
+    Node.js
+    JavaScript 
+    Pipelines CI/CD
+    Testes unitários com Jest
 
