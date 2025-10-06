@@ -1,0 +1,81 @@
+name: CI/CD Pipeline
+
+on:
+  # Permite rodar manualmente pela interface do GitHub
+  workflow_dispatch:
+  
+  # Dispara os jobs de teste E os jobs de deploy (condicionalmente, via 'if')
+  push:
+    branches: [main, develop]
+    
+  # Dispara SOMENTE o job de teste (test-ci) para verificar o código antes do merge
+  pull_request: 
+    branches: [main, develop]
+
+jobs:
+  # -------------------------------------------------------------
+  # JOB 1: TESTES DE INTEGRAÇÃO CONTÍNUA (CI)
+  # Este job roda em Pull Requests e em Pushes para develop/main
+  # -------------------------------------------------------------
+  test-ci:
+    # Usa o runner mais recente para melhor velocidade e evitar filas
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # Usa as versões LTS modernas (resolve o erro 'availableParallelism')
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v3 # Use a versão mais recente
+    
+    # 💡 RECOMENDADO: ADICIONAR CACHE AQUI para acelerar o 'npm ci'
+    # (O código do cache está na nossa resposta anterior)
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3 # Use a versão mais recente
+      with:
+        node-version: ${{ matrix.node-version }}
+        
+    - run: npm ci
+    - run: npm run test
+
+  # -------------------------------------------------------------
+  # JOB 2: DEPLOY PARA TEST/STAGING
+  # Roda SOMENTE se o test-ci passar E for um push na branch 'develop'
+  # -------------------------------------------------------------
+  deploy-test:
+    needs: test-ci
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    concurrency: deploy-to-test
+    environment: test
+    
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js 20.x # Versão moderna para consistência (era 16.x)
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+      - run: docker build -t setup-nodejs .
+      - run: echo "Deploying to Test Environment"
+      
+  # -------------------------------------------------------------
+  # JOB 3: DEPLOY PARA PRODUÇÃO
+  # Roda SOMENTE se o test-ci passar E for um push na branch 'main'
+  # -------------------------------------------------------------
+  deploy-production:
+    needs: test-ci
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    concurrency: deploy-to-production
+    environment: production
+    
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js 20.x # Versão moderna para consistência (era 16.x)
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20.x
+      - run: docker build -t setup-nodejs .
+      - run: echo "Deploying to Production Environment"
